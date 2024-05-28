@@ -29,10 +29,10 @@ class Program
         WaitForSingleObject(threadHandle, 0xFFFFFFFF);
 
         // Call a random method to obfuscate further
-        CallRandomMethod();
+        callkarbebhai();
     }
 
-    static void CallRandomMethod()
+    static void callkarbebhai()
     {
         MethodInfo[] methods = typeof(BenignClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
         Random rand = new Random();
@@ -81,16 +81,16 @@ class BenignClass
 {
     public static void Methodexecuted1()
     {
-        Console.WriteLine("Method1 is executed.");
+        Console.WriteLine("Single but no Available.");
     }
 
     public static void Methodexecuted2()
     {
-        Console.WriteLine("Method2 are executed.");
+        Console.WriteLine("ove my Mom dad ");
     }
 
     public static void Methodexecuted3()
     {
-        Console.WriteLine("Method3 had executed.");
+        Console.WriteLine("Searching my queen.");
     }
 }
