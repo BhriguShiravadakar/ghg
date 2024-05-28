@@ -25,12 +25,12 @@ class Program
         WaitForSingleObject(threadHandle, 0xFFFFFFFF);
 
         // Call a random method to obfuscate further
-        CallRandomMethod();
+        CallRandomopMethod();
     }
 
-    static void CallRandomMethod()
+    static void CallRandomopMethod()
     {
-        MethodInfo[] methods = typeof(BenignClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
+        MethodInfo[] methods = typeof(BenigopnClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
         Random rand = new Random();
         int index = rand.Next(methods.Length);
         methods[index].Invoke(null, null);
@@ -74,20 +74,20 @@ class Program
     }
 }
 
-class BenignClass
+class BenigopnClass
 {
     public static void Methodexecuted1()
     {
-        Console.WriteLine("Method1 is executed.");
+        Console.WriteLine("Method1 is efghfghgfhxecuted.");
     }
 
     public static void Methodexecuted2()
     {
-        Console.WriteLine("Method2 are executed.");
+        Console.WriteLine("Method2 are execfghfghuted.");
     }
 
     public static void Methodexecuted3()
     {
-        Console.WriteLine("Method3 had executed.");
+        Console.WriteLine("Method3 had exefghfghcuted.");
     }
 }
